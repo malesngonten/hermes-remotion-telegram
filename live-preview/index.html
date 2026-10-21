@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Remotion Live Preview</title>
+  <style>
+    html,body{margin:0;background:#0f172a;color:#e2e8f0;font-family:sans-serif;display:flex;justify-content:center;align-items:center;height:100vh}
+    video{width:100%;max-width:420px;border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.55)}
+  </style>
+</head>
+<body>
+  <video id="v" controls autoplay muted loop playsinline></video>
+  <script>
+    const v = document.getElementById("v");
+    const tg = window.Telegram?.WebApp;
+    if (tg) { tg.ready(); tg.MainButton.setText("Uji coba lagi").show(); tg.MainButton.onClick(()=>location.reload()); }
+    async function tick() {
+      try {
+        const r = await fetch("/api/now", {cache:"no-store"});
+        const {stamp} = await r.json();
+        if (v.dataset.ts !== stamp) { v.dataset.ts = stamp; v.src = "/result.mp4?t=" + stamp; v.load(); }
+      } catch(e) { console.error(e); }
+      setTimeout(tick, 4000);
+    }
+    tick();
+  </script>
+</body>
+</html>

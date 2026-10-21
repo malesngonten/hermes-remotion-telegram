@@ -1,55 +1,68 @@
 ---
-name: remotion-telegram-render
-description: "Use this skill to render a Remotion composition to an MP4 video and return the output path (or a public URL) so the clip can be shared inside Telegram. Triggers on: render a video, make a motion graphic, generate a <Composition> clip, render <comp> with remotion, create a telegram video."
-tags: ["remotion", "video", "motion-graphics", "telegram", "render"]
+name: remotion-telegram-studio
+description: "Use this skill to open Remotion Studio inside Telegram, edit source files on this device via the Hermes agent, and see changes in real-time via hot-reload. Triggers on: buka studio remotion di telegram, edit komposisi remotion, ubah warna/animasi remotion, live preview remotion, studio remotion lewat telegram."
+tags: ["remotion", "studio", "telegram", "live-preview", "hot-reload", "edit-source"]
 ---
 
-# Remotion → Telegram render skill
+# Remotion Studio → Telegram (Live, Device-Local)
 
-Lets the **Hermes Agent** generate a video from a Remotion composition and
-deliver it in-chat (or via a CDN link the Telegram Web App can play).
+## Arsitektur
+Semua file sumber dan asset Remotion **tetap ada di device ini**. Tidak ada upload ke Vercel / GitHub Pages / cloud. Studio dev server (`remotion preview`) di-expose ke publik via cloudflared tunnel HTTPS, lalu dibuka sebagai Telegram Web App / in-app browser.
 
-## 1. Locate the project
-- The Remotion project lives at `remotion/` (see repo root).
-- Entry point: `remotion/src/index.tsx` (calls `registerRoot`).
-- Registered compositions: `MotionScene` (120f @ 30fps, 1920×1080) and
-  `HelloWorld` (60f @ 30fps).
+```
+[Device ini]
+  remotion preview   →  localhost:3000
+     └─ cloudflared  →  https://<acak>.trycloudflare.com  ← dibuka di Telegram
+```
 
-## 2. Render a composition from the agent
-Run via the project's local CLI (Chromium headless-shell is cached by Remotion
-on first run; on ARM64/PRoot ensure the apt Chrome deps are installed — see
-repo root README):
+Setiap kali Hermes agent mengedit file di `remotion/src/*`, Studio otomatis **hot-reload** (WebSocket lewat tunnel) → perubahan terlihat real-time di Telegram.
+
+## 1. Nyalakan stack (jalankan sekali di device)
 
 ```bash
-cd /root/hermes-remotion-telegram/remotion
-npx remotion render src/index.tsx <CompositionId> output/<name>.mp4 \
-  --frames 0-59 --crf 23 --overwrite
+cd /root/hermes-remotion-telegram
+bash scripts/dev-stack.sh
 ```
 
-- `--frames 0-59` → render only the first 2s (fast preview).
-- `--overwrite` → allow re-running without prompt.
-- Output is a valid H.264 MP4; validate with `ffprobe`.
-
-## 3. Deliver into Telegram
-Option A — **inline**: attach `output/<name>.mp4` (MEDIA path) directly in the
-reply so the user sees the clip instantly.
-
-Option B — **Web App link**: upload the MP4 to stable storage (e.g. GitHub
-release asset / S3), then reply with the URL; the Telegram Web App
-(`web/app/page.tsx`) accepts `?video=<url>` and plays it in-app.
-
-## 4. Typical agent workflow
+Output akan menampilkan URL publik, misalnya:
 ```
-1. parse user intent → choose CompositionId (default MotionScene).
-2. run remotion render (see step 2).
-3. confirm output exists + ffprobe shows h264 1920x1080 N frames.
-4. deliver: attach file inline OR upload + send Web App link.
+Publik : https://encouraged-graphs-goes-cave.trycloudflare.com
 ```
 
-## 5. Gotchas
-- Never `remotion preview`/`studio` and block on a server the user can't reach —
-  prefer rendering a short clip and delivering it.
-- If Chromium fails to launch with `libnspr4.so` etc., the host needs the apt
-  Chrome deps; render will also fail — install them then retry.
-- ARM64 hosts: Remotion ships `compositor-linux-arm64-gnu`; the headless-shell
-  download is automatic but needs the system libs above.
+Buka URL tersebut **di dalam aplikasi Telegram** (in-app browser). Remotion Studio asli akan muncul (bundle dev 10 MB, muat pertama kali butuh ~1–2 menit tergantung jaringan).
+
+## 2. Edit lewat Hermes agent (dari chat Telegram)
+
+Ketik perintah seperti ini ke Hermes di Telegram:
+
+- `"Ubah warna kotak di MotionScene jadi hijau"` → Hermes edit `remotion/src/MotionScene.tsx`, simpan, Studio hot-reload.
+- `"Ubah tulisan HERMES jadi REMOTION LIVE"` → Hermes edit teks di komposisi.
+- `"Tambahkan animasi rotasi pada judul"` → Hermes tambahkan kode animasi.
+- `"Buka file MotionScene.tsx"` → Hermes baca isi file untuk kamu review.
+
+Hermes akan:
+1. Baca file yang relevan di `remotion/src/`
+2. Terapkan perubahan yang kamu minta
+3. Simpan file di device (tidak perlu commit/push)
+4. Studio dev server mendeteksi file berubah → hot-reload otomatis
+5. Kamu lihat hasilnya langsung di Telegram tanpa refresh manual
+
+## 3. URL Publik (non-permanen)
+
+URL trycloudflare.com adalah acak dan berubah setiap kali cloudflared di-restart. Jika mau URL tetap, butuh domain sendiri + reverse proxy. Untuk sementara, setiap kali kamu nyalakan `dev-stack.sh`, ambil URL baru dari `logs/tunnel.log` dan buka di Telegram.
+
+## 4. File yang terlibat
+
+| File | Fungsi |
+|------|--------|
+| `remotion/src/index.tsx` | Entry point, `registerRoot`, daftar komposisi |
+| `remotion/src/MotionScene.tsx` | Komposisi utama (120 frame, 1920×1080) |
+| `remotion/src/HelloWorld.tsx` | Komposisi contoh kedua |
+| `remotion/remotion.config.ts` | Konfigurasi CLI (kosong, default) |
+| `scripts/dev-stack.sh` | Nyalakan Studio + tunnel |
+
+## 5. Catatan
+
+- Bundle dev Remotion adalah 10 MB. Saat pertama kali membuka URL publik di Telegram, layar mungkin putih beberapa menit sambil bundle diunduh. Setelah ter-load, setiap edit muncul dalam hitungan detik.
+- Tidak perlu `vercel`, `git push`, atau upload asset ke mana pun. Semua operasi edit bersifat lokal di device.
+- Untuk menutup: `pkill -f "remotion preview" && pkill -f "cloudflared tunnel"`.
