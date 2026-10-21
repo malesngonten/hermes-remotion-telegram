@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Hermes Remotion Studio</title>
+  <style>
+    :root { color-scheme: dark; }
+    body { margin:0; font-family:-apple-system,system-ui,sans-serif;
+           background:#0f172a; color:#e2e8f0; padding:14px; }
+    h1 { font-size:1rem; margin:0 0 8px; }
+    .meta { font-size:.8rem; opacity:.6; margin-bottom:10px; }
+    video { width:100%; border-radius:12px; box-shadow:0 12px 40px rgba(0,0,0,.5);
+            background:#000; }
+    .pulse { display:inline-block; width:8px;height:8px;border-radius:50%;
+             background:#22c55e; margin-right:6px; animation:pulse 1.6s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+    #reload { margin-top:10px; padding:8px 12px; border-radius:8px; border:1px solid #334155; background:#1e293b; cursor:pointer; font-size:.85rem; }
+  </style>
+</head>
+<body>
+  <h1><span class="pulse"></span>Hermes Remotion Player</h1>
+  <div class="meta" id="meta">Polling for the latest render…</div>
+  <video id="v" controls playsinline autoplay muted loop></video>
+  <div id="reload">⏎ Muat ulang sekarang</div>
+
+  <script>
+    const REPO = "malesngonten/hermes-remotion-telegram";
+    const FILE = "remotion/output/result.mp4";
+    const RAW = `https://raw.githubusercontent.com/${REPO}/main/${FILE}`;
+    const API = `https://api.github.com/repos/${REPO}/contents/${FILE}`;
+    const video = document.getElementById("v");
+    const meta = document.getElementById("meta");
+    const reloadBtn = document.getElementById("reload");
+
+    // Telegram Web App bridge (if opened inside Telegram in-app browser).
+    const tg = window.Telegram?.WebApp;
+    if (tg) {
+      tg.ready();
+      tg.MainButton.setText("🔴 Minta render via Hermes").show();
+      tg.MainButton.onClick(() => tg.sendData(JSON.stringify({ action: "render", composition: "MotionScene" })));
+      meta.textContent = "Opened via Telegram Web App";
+    }
+
+    let lastSha = "";
+    async function checkUpdate() {
+      try {
+        const r = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
+        if (!r.ok) { meta.textContent = "Video belum di-commit (commit remotion/output/result.mp4)"; return; }
+        const d = await r.json();
+        if (d.sha && d.sha !== lastSha) {
+          lastSha = d.sha;
+          meta.textContent = `✓ Update: ${new Date(d["_links"]?.self || "").toLocaleTimeString()}`;
+          video.src = RAW + "?t=" + d.sha.slice(0, 8);
+        }
+      } catch (e) {
+        meta.textContent = "Gagal cek update (rate limit/ offline). Coba jalankan `hermes render-and-publish`.";
+      }
+    }
+
+    video.addEventListener("loadeddata", () => (meta.textContent = "Siap ▸"));
+    reloadBtn.onclick = () => { video.load(); };
+    checkUpdate();
+    setInterval(checkUpdate, 10000);
+  </script>
+</body>
+</html>
