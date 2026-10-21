@@ -1,0 +1,13 @@
+{
+  "name": "hermes-remotion-telegram",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "remotion",
+    "web",
+    "bot"
+  ],
+  "scripts": {
+    "render:sample": "remotion render remotion/src/index.tsx MotionScene remotion/output/result.mp4"
+  }
+}
