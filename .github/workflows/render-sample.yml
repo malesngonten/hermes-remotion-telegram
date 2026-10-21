@@ -1,0 +1,23 @@
+name: Render sample
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Chrome deps are preinstalled on ubuntu-latest.
+      - run: cd remotion && npm ci
+      - run: npx remotion render src/index.tsx MotionScene remotion/output/result.mp4 --frames 0-59 --crf 23 --overwrite
+      - name: Upload sample video
+        uses: actions/upload-artifact@v4
+        with:
+          name: motion-scene-sample
+          path: remotion/output/result.mp4
+          if-no-files-found: error

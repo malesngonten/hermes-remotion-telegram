@@ -1,0 +1,16 @@
+{
+  "name": "hermes-remotion-telegram-bot",
+  "version": "0.1.0",
+  "private": true,
+  "main": "src/bot.ts",
+  "scripts": {
+    "start": "node -r module-register/tsx-cjs src/bot.ts",
+    "dev": "tsx watch src/bot.ts"
+  },
+  "dependencies": {
+    "telegraf": "^4.15.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.7.0"
+  }
+}
